@@ -354,7 +354,7 @@ function render() {
         '<div class="num-wrap" style="border-color:' + tab.color + '"><div class="num" style="color:' + tab.color + '">' + money(monthCost) + '</div></div>' +
         '<div class="nav"><button onclick="shiftMonth(-1)">&lsaquo;</button><button onclick="shiftMonth(1)">&rsaquo;</button></div>' +
       '</div>' +
-      '<div class="month-label">' + monthLabel + '</div>' +
+      '<div class="month-label">' + monthLabel + ' &nbsp;·&nbsp; <a href="#" onclick="openShareSummary();return false;" style="color:var(--text-dim);">Share summary</a></div>' +
     '</div>' +
     toolbarHtml +
     '<div class="grid">' +
@@ -440,13 +440,73 @@ function openDay(dateStr) {
     '<h2>' + label + '</h2>' +
     (tabIdsWithEntries.length > 1 ? ('<div class="day-total-line">Day total across all activities: <strong>' + money(dayTotal) + '</strong></div>') : '') +
     '<div id="entryList">' + sectionsHtml + '</div>' +
-    '<h2 style="margin-top:16px;" id="entryFormTitle">Add entry</h2>' +
+    '<h2 style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;" id="entryFormTitle"><span id="entryFormTitleText">Add entry</span><button class="theme-btn" style="flex:none;padding:5px 11px;font-size:11px;" onclick="repeatLastEntry()">Repeat last</button></h2>' +
     activitySelect +
     '<input type="hidden" id="entryEditId" value="">' +
-    '<div class="row"><input id="entryPeople" type="number" placeholder="People" min="0"><input id="entryCost" type="number" placeholder="Cost" min="0" step="0.01"></div>' +
+    '<div class="row"><input id="entryPeople" type="number" placeholder="People" min="0" oninput="updatePerPersonPreview()"><input id="entryCost" type="number" placeholder="Cost" min="0" step="0.01" oninput="updatePerPersonPreview()"></div>' +
+    '<div id="perPersonPreview" style="font-size:11px;color:var(--text-dim);margin:-4px 0 8px;"></div>' +
     '<input id="entryNote" placeholder="Note (optional)">' +
     '<button class="primary" id="entrySaveBtn" style="background:var(--accent)" onclick="addEntry(\'' + dateStr + '\')">Add</button>';
   overlay().classList.add("show");
+}
+
+function openShareSummary() {
+  const isAll = activeTabId === ALL_ID;
+  const tabLabel = isAll ? "All activities" : ((tabs.find(function(t){return t.id===activeTabId;})||{}).name || "");
+  const scoped = isAll ? entries.slice() : entries.filter(function(e){ return e.tabId === activeTabId; });
+  const y = viewDate.getFullYear(), m = viewDate.getMonth();
+  const monthEntries = scoped.filter(function(e){ const d=new Date(e.date+"T00:00"); return d.getFullYear()===y && d.getMonth()===m; }).sort(function(a,b){ return a.date.localeCompare(b.date); });
+  const monthLabel = viewDate.toLocaleDateString(undefined,{month:"long", year:"numeric"});
+
+  let lines = [tabLabel + " — " + monthLabel];
+  let total = 0;
+  monthEntries.forEach(function(e){
+    total += e.cost;
+    const perPerson = e.people > 0 ? (" ($" + (e.cost/e.people).toFixed(2) + " each)") : "";
+    const namePrefix = isAll ? (((tabs.find(function(t){return t.id===e.tabId;})||{}).name || "?") + " — ") : "";
+    lines.push(namePrefix + e.date + ": " + money(e.cost) + (e.people ? (" · " + e.people + " people" + perPerson) : "") + (e.note ? (" · " + e.note) : ""));
+  });
+  lines.push("Total: " + money(total));
+  const text = lines.length > 2 ? lines.join("\n") : (lines[0] + "\nNo entries logged this month.");
+
+  sheet().innerHTML =
+    '<button class="close" onclick="closeSheet()">Close</button>' +
+    '<h2>Share summary</h2>' +
+    '<textarea id="shareText" readonly style="width:100%;min-height:160px;font-family:\'Space Mono\',monospace;font-size:12px;padding:10px;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--text);">' + text.replace(/</g,"&lt;") + '</textarea>' +
+    '<button class="primary" onclick="copyShareText()">Copy to clipboard</button>' +
+    '<div id="copyStatus" style="font-size:11px;color:var(--text-dim);margin-top:6px;text-align:center;"></div>';
+  overlay().classList.add("show");
+}
+
+async function copyShareText() {
+  const textEl = document.getElementById("shareText");
+  const status = document.getElementById("copyStatus");
+  try {
+    await navigator.clipboard.writeText(textEl.value);
+    status.textContent = "Copied to clipboard.";
+  } catch (e) {
+    textEl.select();
+    status.textContent = "Couldn't auto-copy — text is selected, use Ctrl+C.";
+  }
+}
+
+function updatePerPersonPreview() {
+  const el = document.getElementById("perPersonPreview");
+  if (!el) return;
+  const people = parseInt(document.getElementById("entryPeople").value) || 0;
+  const cost = parseFloat(document.getElementById("entryCost").value) || 0;
+  el.textContent = (people > 0 && cost > 0) ? ("= " + money(cost / people) + " per person") : "";
+}
+
+function repeatLastEntry() {
+  const tabId = document.getElementById("entryTab").value;
+  const candidates = entries.filter(function(e){ return e.tabId === tabId; }).sort(function(a,b){ return b.createdAt - a.createdAt; });
+  if (!candidates.length) return;
+  const last = candidates[0];
+  document.getElementById("entryPeople").value = last.people || "";
+  document.getElementById("entryCost").value = last.cost || "";
+  document.getElementById("entryNote").value = last.note || "";
+  updatePerPersonPreview();
 }
 
 function editEntry(id) {
@@ -458,7 +518,8 @@ function editEntry(id) {
   document.getElementById("entryNote").value = e.note || "";
   document.getElementById("entryEditId").value = id;
   document.getElementById("entrySaveBtn").textContent = "Save changes";
-  document.getElementById("entryFormTitle").textContent = "Edit entry";
+  document.getElementById("entryFormTitleText").textContent = "Edit entry";
+  updatePerPersonPreview();
 }
 
 async function addEntry(dateStr) {
