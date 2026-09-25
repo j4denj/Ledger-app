@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF7F2; --panel: #FFFFFF; --line: #E8E1D6; --text: #2B2620; --text-dim: #8A8172;
+    --accent: #2F6E63; --accent-ink: #FFFFFF; --rule: rgba(43,38,32,0.035);
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17140F; --panel: #211D17; --line: #362F25; --text: #EDE7DC; --text-dim: #9C9384;
+      --accent: #5FBBA9; --accent-ink: #0E1512; --rule: rgba(237,231,220,0.04);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17140F; --panel: #211D17; --line: #362F25; --text: #EDE7DC; --text-dim: #9C9384;
+    --accent: #5FBBA9; --accent-ink: #0E1512; --rule: rgba(237,231,220,0.04);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background-color: var(--bg); color: var(--text);
+    background-image: repeating-linear-gradient(var(--rule) 0px, var(--rule) 1px, transparent 1px, transparent 27px);
+    font-family: 'Space Mono', monospace;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 18px 16px 100px; }
+
+  .masthead { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .masthead-row { display: flex; align-items: flex-start; justify-content: space-between; margin: 4px 0 16px; gap: 12px; }
+  .tagline { font-size: 12px; color: var(--text-dim); margin-top: 4px; max-width: 46ch; line-height: 1.4; }
+  .gear { background: none; border: 1px solid var(--line); border-radius: 6px; width: 34px; height: 34px; font-size: 15px; color: var(--text-dim); cursor: pointer; }
+  .theme-btn { flex: 1; padding: 9px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 12px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.03em; }
+  .theme-btn.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+  .tabbar { display: flex; gap: 4px; overflow-x: auto; margin-bottom: 0; border-bottom: 3px solid var(--text); }
+  .tab {
+    flex: 0 0 auto; padding: 9px 16px 8px; border-radius: 8px 8px 0 0; border: 1px solid var(--line); border-bottom: none;
+    background: var(--panel); color: var(--text-dim); font-size: 12px; cursor: pointer; white-space: nowrap;
+    text-transform: uppercase; letter-spacing: 0.04em; position: relative; top: 1px;
+  }
+  .tab.active { color: var(--accent-ink); border-color: var(--text); }
+  .tab-add {
+    flex: 0 0 auto; width: 30px; height: 28px; border-radius: 8px 8px 0 0; border: 1px dashed var(--line); border-bottom: none;
+    background: none; color: var(--text-dim); font-size: 16px; cursor: pointer; position: relative; top: 1px;
+  }
+  .wrap > #root { margin-top: 20px; }
+
+  .hero { border-bottom: 2px solid var(--text); padding-bottom: 18px; margin-bottom: 18px; }
+  .hero .cap { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 2px; }
+  .hero .row { display: flex; align-items: baseline; justify-content: space-between; }
+  .hero .num-wrap { display: inline-block; border: 2px solid var(--accent); border-radius: 4px; padding: 4px 16px; transform: rotate(-1deg); position: relative; }
+  .hero .num-wrap::after { content: ""; position: absolute; inset: 4px; border: 1px solid var(--accent); border-radius: 2px; opacity: 0.45; pointer-events: none; }
+  .hero .num { font-family: 'Fraunces', serif; font-size: 48px; font-weight: 600; line-height: 1.15; color: var(--accent); }
+  .hero .nav { display: flex; gap: 2px; align-items: center; }
+  .hero .nav button { background: none; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; padding: 4px 8px; }
+  .hero .month-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 22px; }
+  .dow { text-align: center; font-size: 10px; color: var(--text-dim); padding-bottom: 4px; text-transform: uppercase; }
+  .day {
+    aspect-ratio: 1; border-radius: 4px; border: 1px solid var(--line); background: var(--panel);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 12px; cursor: pointer; padding: 2px;
+  }
+  .day.empty { visibility: hidden; }
+  .day.today { border-color: var(--accent); border-width: 2px; }
+  .day.selected { background: var(--accent); border-color: transparent; }
+  .day.selected div, .day.selected .cost { color: var(--accent-ink); }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .day .cost { font-size: 9px; color: var(--accent); margin-top: 2px; font-weight: 700; }
+  .day-dots { display: flex; gap: 3px; margin-top: 2px; justify-content: center; flex-wrap: wrap; }
+  .badge-sm { width: 11px; height: 11px; border-radius: 2px; font-size: 7px; line-height: 11px; text-align: center; color: #fff; font-weight: 700; }
+  .day-dots .dot-more { font-size: 8px; color: var(--text-dim); }
+  .activity-block { margin-bottom: 14px; }
+  .activity-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .badge { width: 16px; height: 16px; border-radius: 3px; font-size: 9px; line-height: 16px; text-align: center; color: #fff; font-weight: 700; display: inline-block; flex: none; }
+  .activity-label .activity-sub { margin-left: auto; color: var(--text-dim); font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .day-total-line { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; }
+  .day div:first-child { font-family: 'Fraunces', serif; font-weight: 600; font-size: 14px; }
+
+  .card { background: transparent; border: none; border-top: 1px solid var(--line); border-radius: 0; padding: 14px 0; margin-bottom: 0; }
+  .card + .card { border-top: 1px solid var(--line); }
+  .card .cap { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 10px; }
+  .card .stat-num { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 600; }
+
+  .recent-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .recent-row:last-child { border-bottom: none; }
+  .recent-row .amt { color: var(--accent); font-weight: 700; }
+
+  .fab {
+    position: fixed; right: 20px; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    width: 54px; height: 54px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+    border: none; font-size: 26px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,16,10,0.5); display: flex;
+    align-items: flex-end; justify-content: center; z-index: 10;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .sheet {
+    background: var(--panel); width: 100%; max-width: 640px; border-radius: 10px 10px 0 0;
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    max-height: 80vh; overflow-y: auto;
+    transform: translateY(16px); transition: transform 0.22s ease;
+  }
+  .overlay.show .sheet { transform: translateY(0); }
+  .sheet h2 { font-family: 'Fraunces', serif; font-size: 17px; margin: 0 0 12px; font-weight: 600; }
+  .sheet input, .sheet select {
+    width: 100%; padding: 9px 10px; margin-bottom: 8px; border-radius: 4px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 14px;
+    font-family: 'Space Mono', monospace;
+  }
+  .sheet .row { display: flex; gap: 8px; }
+  .sheet button.primary {
+    width: 100%; padding: 11px; border-radius: 4px; border: none; background: var(--accent);
+    color: var(--accent-ink); font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 4px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .sheet button.close { background: none; border: none; color: var(--text-dim); font-size: 13px; float: right; cursor: pointer; }
+  .entry-row {
+    display: flex; justify-content: space-between; align-items: center; padding: 8px 0;
+    border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .entry-row .del { color: var(--accent); background: none; border: none; cursor: pointer; font-size: 11px; text-transform: uppercase; }
+  .empty-msg { color: var(--text-dim); font-size: 13px; text-align: center; padding: 30px 0; }
+  .welcome-card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 28px 22px; text-align: center; }
+  .welcome-eg { font-size: 13px; color: var(--text-dim); line-height: 1.6; max-width: 40ch; margin: 0 auto 18px; }
+  .swatch { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead-row">
+    <div><div class="masthead">Ledger</div><div class="tagline">Track what your activities actually cost — one calendar per activity, plus the combined total.</div></div>
+    <button class="gear" onclick="openSettings()">&#9881;</button>
+  </div>
+  <div id="root"><div class="empty-msg">Loading</div></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+const PALETTES = {
+  teal:   { name: "Teal",   light:{bg:"#FAF7F2",panel:"#FFFFFF",line:"#E8E1D6",text:"#2B2620",textDim:"#8A8172",accent:"#2F6E63",accentInk:"#FFFFFF"}, dark:{bg:"#17140F",panel:"#211D17",line:"#362F25",text:"#EDE7DC",textDim:"#9C9384",accent:"#5FBBA9",accentInk:"#0E1512"} },
+  clay:   { name: "Clay",   light:{bg:"#F6F1E7",panel:"#FFFDF8",line:"#E3D9C6",text:"#231F1A",textDim:"#8A7F6B",accent:"#D8492A",accentInk:"#FFFDF8"}, dark:{bg:"#1B1712",panel:"#24201A",line:"#3A3226",text:"#F1EADE",textDim:"#9C907C",accent:"#E8693F",accentInk:"#1B1712"} },
+  indigo: { name: "Indigo", light:{bg:"#F3F1FA",panel:"#FFFFFF",line:"#DEDAEE",text:"#211E33",textDim:"#7B7699",accent:"#4C3F91",accentInk:"#FFFFFF"}, dark:{bg:"#15131F",panel:"#1E1B2C",line:"#332E4A",text:"#E8E5F5",textDim:"#9691B5",accent:"#8C7FE0",accentInk:"#15131F"} },
+  forest: { name: "Forest", light:{bg:"#F2F5EC",panel:"#FFFFFF",line:"#DCE3CE",text:"#232B1B",textDim:"#76806A",accent:"#3F6B2E",accentInk:"#FFFFFF"}, dark:{bg:"#12160D",panel:"#1B2113",line:"#2E3820",text:"#E7EBDD",textDim:"#8E9A7E",accent:"#7FB35F",accentInk:"#12160D"} }
+};
+
+function getSavedTheme() { try { return localStorage.getItem("ledgerTheme") || "auto"; } catch(e) { return "auto"; } }
+function getSavedPalette() { try { return localStorage.getItem("ledgerPalette") || "teal"; } catch(e) { return "teal"; } }
+
+function isDarkActive() {
+  const override = getSavedTheme();
+  if (override === "dark") return true;
+  if (override === "light") return false;
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+function applyPalette(name) {
+  const p = PALETTES[name] || PALETTES.teal;
+  const vals = isDarkActive() ? p.dark : p.light;
+  const root = document.documentElement;
+  root.style.setProperty("--bg", vals.bg);
+  root.style.setProperty("--panel", vals.panel);
+  root.style.setProperty("--line", vals.line);
+  root.style.setProperty("--text", vals.text);
+  root.style.setProperty("--text-dim", vals.textDim);
+  root.style.setProperty("--accent", vals.accent);
+  root.style.setProperty("--accent-ink", vals.accentInk);
+  try { localStorage.setItem("ledgerPalette", name); } catch(e) {}
+  const sel = document.querySelector('.swatch[data-pal="' + name + '"]');
+  if (sel) document.querySelectorAll('.swatch[data-pal]').forEach(function(s){ s.style.borderColor = s===sel ? "var(--text)" : "transparent"; });
+}
+
+function setThemeOverride(mode) {
+  try { localStorage.setItem("ledgerTheme", mode); } catch(e) {}
+  document.querySelectorAll(".theme-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.mode===mode); });
+  applyPalette(getSavedPalette());
+}
+
+function openSettings() {
+  const activePalette = getSavedPalette();
+  const activeTheme = getSavedTheme();
+  let swatches = Object.keys(PALETTES).map(function(key){
+    return '<div class="swatch" data-pal="' + key + '" style="background:' + PALETTES[key].light.accent + ';border-color:' + (key===activePalette?'var(--text)':'transparent') + '" onclick="applyPalette(\'' + key + '\')" title="' + PALETTES[key].name + '"></div>';
+  }).join("");
+  let manageHtml = tabs.length ? tabs.map(function(t){
+    return '<div class="row" style="align-items:center;margin-bottom:8px;">' +
+      '<span class="badge" style="background:' + t.color + ';margin-right:4px;">' + initial(t.name) + '</span>' +
+      '<input value="' + t.name.replace(/"/g,'&quot;') + '" onchange="renameTab(\'' + t.id + '\', this.value)" style="flex:1;margin-bottom:0;">' +
+      '<button data-armed="0" onclick="confirmDeleteTab(\'' + t.id + '\', this)" style="flex:none;background:none;border:none;color:var(--accent);font-size:11px;text-transform:uppercase;cursor:pointer;">Delete</button>' +
+    '</div>';
+  }).join("") : '<div class="empty-msg" style="padding:10px 0;">No activities yet</div>';
+
+  sheet().innerHTML =
+    '<button class="close" onclick="closeSheet()">Close</button>' +
+    '<h2>Settings</h2>' +
+    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:8px;">Color palette</div>' +
+    '<div class="row" style="margin-bottom:18px;">' + swatches + '</div>' +
+    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:8px;">Appearance</div>' +
+    '<div class="row" style="margin-bottom:18px;">' +
+      '<button class="theme-btn' + (activeTheme==='auto'?' active':'') + '" data-mode="auto" onclick="setThemeOverride(\'auto\')">Auto</button>' +
+      '<button class="theme-btn' + (activeTheme==='light'?' active':'') + '" data-mode="light" onclick="setThemeOverride(\'light\')">Light</button>' +
+      '<button class="theme-btn' + (activeTheme==='dark'?' active':'') + '" data-mode="dark" onclick="setThemeOverride(\'dark\')">Dark</button>' +
+    '</div>' +
+    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:8px;">Manage activities</div>' +
+    manageHtml +
+    '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);text-align:center;">' +
+      '<a href="mailto:your-email@example.com?subject=Ledger%20feedback" style="color:var(--text-dim);font-size:12px;">Send feedback or report a bug</a>' +
+    '</div>';
+  overlay().classList.add("show");
+}
+
+function renameTab(id, newName) {
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+  db.doc("tabs/" + id).update({ name: trimmed });
+}
+
+function confirmDeleteTab(id, btn) {
+  if (btn.dataset.armed === "1") {
+    deleteTabAndEntries(id);
+  } else {
+    btn.dataset.armed = "1";
+    btn.textContent = "Confirm?";
+    setTimeout(function(){ if (btn && btn.dataset) { btn.dataset.armed = "0"; btn.textContent = "Delete"; } }, 3000);
+  }
+}
+
+async function deleteTabAndEntries(tabId) {
+  const related = entries.filter(function(e){ return e.tabId === tabId; });
+  for (const e of related) { await db.doc("entries/" + e.id).delete(); }
+  await db.doc("tabs/" + tabId).delete();
+  if (activeTabId === tabId) activeTabId = null;
+  openSettings();
+}
+
+(function initAppearance() {
+  try {
+    const savedTheme = getSavedTheme();
+    if (savedTheme !== "auto") document.documentElement.setAttribute("data-theme", savedTheme);
+  } catch(e) {}
+  applyPalette(getSavedPalette());
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(){ applyPalette(getSavedPalette()); });
+  }
+})();
+
+const PALETTE = ["#2F6E63","#A3492E","#B8873A","#4C5B7A","#7A6A8C","#8C5A52"];
+const ALL_ID = "__all__";
+let db = null;
+let tabs = [], entries = [];
+let activeTabId = null;
+let viewDate = new Date(); viewDate.setDate(1);
+let selectMode = false;
+let selectedDates = new Set();
+
+function fmtDate(d) { return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function money(n) { return "$" + n.toFixed(2); }
+function initial(name) { return (name || "?").trim().charAt(0).toUpperCase(); }
+function root() { return document.getElementById("root"); }
+function overlay() { return document.getElementById("overlay"); }
+function sheet() { return document.getElementById("sheet"); }
+function closeSheet() { overlay().classList.remove("show"); }
+
+function render() {
+  if (!db) {
+    root().innerHTML = '<div class="empty-msg">Storage is not available in this view. Open this page from claude.ai to save data.</div>';
+    return;
+  }
+  const tabbarExisting = document.querySelector(".tabbar");
+  if (tabbarExisting) tabbarExisting.remove();
+
+  if (tabs.length === 0) {
+    root().innerHTML =
+      '<div class="welcome-card">' +
+        '<div class="welcome-eg">Example: create "Badminton," log $12 and 4 people each lesson, and Ledger totals it up for you — by month, all-time, or across everything you track.</div>' +
+        '<button class="primary" style="width:auto;padding:10px 22px;" onclick="promptNewTab()">Create your first activity</button>' +
+      '</div>';
+    renderTabBar();
+    return;
+  }
+  if (!activeTabId || (activeTabId !== ALL_ID && !tabs.find(t => t.id === activeTabId))) activeTabId = tabs[0].id;
+  renderTabBar();
+
+  const isAllView = activeTabId === ALL_ID;
+  const tab = isAllView ? { id: ALL_ID, name: "All activities", color: "var(--text)" } : tabs.find(t => t.id === activeTabId);
+  const tabEntries = isAllView ? entries : entries.filter(e => e.tabId === activeTabId);
+  const allTimeCost = tabEntries.reduce((s,e) => s + e.cost, 0);
+  const totalPeople = tabEntries.reduce((s,e) => s + (e.people||0), 0);
+
+  const y = viewDate.getFullYear(), m = viewDate.getMonth();
+  const monthLabel = viewDate.toLocaleDateString(undefined,{month:"long", year:"numeric"});
+  const monthEntries = tabEntries.filter(e => { const d=new Date(e.date+"T00:00"); return d.getFullYear()===y && d.getMonth()===m; });
+  const monthCost = monthEntries.reduce((s,e)=>s+e.cost,0);
+
+  const firstDow = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const todayStr = fmtDate(new Date());
+
+  let cells = "";
+  for (let i=0;i<firstDow;i++) cells += '<div class="day empty"></div>';
+  for (let d=1; d<=daysInMonth; d++) {
+    const dateStr = y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+    const dayEntries = tabEntries.filter(e => e.date === dateStr);
+    const cost = dayEntries.reduce((s,e)=>s+e.cost,0);
+    const isSelected = selectMode && selectedDates.has(dateStr);
+    const clickHandler = selectMode ? ("toggleDaySelect('" + dateStr + "')") : ("openDay('" + dateStr + "')");
+    const otherTabIds = Array.from(new Set(entries.filter(function(e){return e.date===dateStr;}).map(function(e){return e.tabId;}))).filter(function(id){return isAllView ? true : id!==activeTabId;});
+    const dotsHtml = otherTabIds.length ? ('<div class="day-dots">' + otherTabIds.slice(0,4).map(function(tid){
+      var t = tabs.find(function(x){return x.id===tid;});
+      return t ? ('<span class="badge-sm" style="background:'+t.color+'">'+initial(t.name)+'</span>') : '';
+    }).join('') + (otherTabIds.length>4 ? '<span class="dot-more">+'+(otherTabIds.length-4)+'</span>' : '') + '</div>') : '';
+    cells += '<div class="day' + (dateStr===todayStr?' today':'') + (isSelected?' selected':'') + '" onclick="' + clickHandler + '"><div>' + d + '</div>' + (cost>0?'<div class="cost">'+money(cost)+'</div>':'') + dotsHtml + '</div>';
+  }
+
+  const recent = [...tabEntries].sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
+  const recentHtml = recent.length ? recent.map(function(e){
+    var badge = "";
+    if (isAllView) {
+      var et = tabs.find(function(x){ return x.id === e.tabId; });
+      if (et) badge = '<span class="badge-sm" style="background:'+et.color+';margin-right:5px;">'+initial(et.name)+'</span>';
+    }
+    return '<div class="recent-row"><div>' + badge + e.date + (e.note?' · '+e.note:'') + '</div><div class="amt">' + money(e.cost) + '</div></div>';
+  }).join("") : '<div class="empty-msg" style="padding:10px 0;">No entries yet</div>';
+
+  const toolbarHtml = '<div class="toolbar">' +
+    '<button class="theme-btn" style="flex:none;padding:7px 14px;" onclick="toggleSelectMode()">' + (selectMode ? 'Cancel select' : 'Select days') + '</button>' +
+    (selectMode && selectedDates.size ? '<button class="theme-btn" style="flex:none;padding:7px 14px;" onclick="clearSelection()">Clear</button>' : '') +
+    '</div>';
+
+  const selEntries = tabEntries.filter(function(e){ return selectedDates.has(e.date); });
+  const selTotal = selEntries.reduce(function(s,e){ return s+e.cost; }, 0);
+  const selSummaryHtml = (selectMode && selectedDates.size) ?
+    ('<div class="card"><div class="cap">Selected — ' + selectedDates.size + ' day' + (selectedDates.size===1?'':'s') + ' (' + tab.name + ')</div><div class="stat-num">' + money(selTotal) + '</div></div>')
+    : '';
+
+  root().innerHTML =
+    '<div class="hero">' +
+      '<div class="cap">This month — ' + tab.name + '</div>' +
+      '<div class="row">' +
+        '<div class="num-wrap" style="border-color:' + tab.color + '"><div class="num" style="color:' + tab.color + '">' + money(monthCost) + '</div></div>' +
+        '<div class="nav"><button onclick="shiftMonth(-1)">&lsaquo;</button><button onclick="shiftMonth(1)">&rsaquo;</button></div>' +
+      '</div>' +
+      '<div class="month-label">' + monthLabel + '</div>' +
+    '</div>' +
+    toolbarHtml +
+    '<div class="grid">' +
+      ["S","M","T","W","T","F","S"].map(function(d){return '<div class="dow">'+d+'</div>';}).join("") +
+      cells +
+    '</div>' +
+    selSummaryHtml.replace(/<div class="card">/, '<div class="card" style="border-left-color:' + tab.color + '">') +
+    '<div class="card" style="border-left-color:' + tab.color + '"><div class="cap">All-time total — ' + tab.name + '</div><div class="stat-num">' + money(allTimeCost) + '</div>' +
+      (tabEntries.length ? ('<div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Avg per session: ' + money(allTimeCost/tabEntries.length) + (totalPeople>0 ? (' · Avg per person: ' + money(allTimeCost/totalPeople)) : '') + '</div>') : '') +
+    '</div>' +
+    '<div class="card" style="border-left-color:' + tab.color + '"><div class="cap">Recent entries</div>' + recentHtml + '</div>' +
+    '<button class="fab" style="background:' + tab.color + '" onclick="openDay(\'' + todayStr + '\')">+</button>';
+}
+
+function renderTabBar() {
+  let allPill = '<div class="tab' + (activeTabId===ALL_ID?' active':'') + '" style="' + (activeTabId===ALL_ID?'background:var(--text);color:var(--bg)':'') + '" onclick="selectTab(\'' + ALL_ID + '\')">All</div>';
+  let html = allPill + tabs.map(function(t){
+    return '<div class="tab' + (t.id===activeTabId?' active':'') + '" style="' + (t.id===activeTabId?('background:'+t.color):'') + '" onclick="selectTab(\'' + t.id + '\')">' + t.name + '</div>';
+  }).join("");
+  html += '<button class="tab-add" onclick="promptNewTab()">+</button>';
+  root().insertAdjacentHTML("beforebegin", '<div class="tabbar">' + html + '</div>');
+}
+
+function shiftMonth(delta) { viewDate.setMonth(viewDate.getMonth()+delta); render(); }
+function selectTab(id) { activeTabId = id; render(); }
+function toggleSelectMode() { selectMode = !selectMode; if (!selectMode) selectedDates.clear(); render(); }
+function toggleDaySelect(dateStr) {
+  if (selectedDates.has(dateStr)) selectedDates.delete(dateStr);
+  else selectedDates.add(dateStr);
+  render();
+}
+function clearSelection() { selectedDates.clear(); render(); }
+
+function promptNewTab() {
+  let swatches = PALETTE.map(function(c){
+    return '<div onclick="pickColor(\'' + c + '\')" data-color="' + c + '" style="background:' + c + '" class="swatch"></div>';
+  }).join("");
+  sheet().innerHTML =
+    '<button class="close" onclick="closeSheet()">Close</button>' +
+    '<h2>New tab</h2>' +
+    '<input id="newTabName" placeholder="e.g. Badminton" autofocus>' +
+    '<div class="row" style="margin-bottom:10px;">' + swatches + '</div>' +
+    '<button class="primary" onclick="createTab()">Create</button>';
+  window.__pickedColor = PALETTE[0];
+  overlay().classList.add("show");
+}
+function pickColor(c) {
+  window.__pickedColor = c;
+  document.querySelectorAll(".swatch").forEach(function(s){ s.style.borderColor = s.dataset.color===c ? "var(--text)" : "transparent"; });
+}
+async function createTab() {
+  const name = document.getElementById("newTabName").value.trim();
+  if (!name) return;
+  await db.collection("tabs").add({ name: name, color: window.__pickedColor || PALETTE[0], createdAt: Date.now() });
+  closeSheet();
+}
+
+function openDay(dateStr) {
+  const dayAllEntries = entries.filter(function(e){ return e.date === dateStr; });
+  const byTab = {};
+  dayAllEntries.forEach(function(e){ (byTab[e.tabId] = byTab[e.tabId] || []).push(e); });
+  const tabIdsWithEntries = Object.keys(byTab);
+  const label = new Date(dateStr+"T00:00").toLocaleDateString(undefined,{weekday:"long", month:"long", day:"numeric"});
+  const activeTab = tabs.find(function(t){ return t.id === activeTabId; });
+  const dayTotal = dayAllEntries.reduce(function(s,e){ return s+e.cost; }, 0);
+
+  let sectionsHtml = tabIdsWithEntries.length ? tabIdsWithEntries.map(function(tid){
+    const t = tabs.find(function(x){ return x.id === tid; }) || { name: "Unknown", color: "#999" };
+    const list = byTab[tid];
+    const subtotal = list.reduce(function(s,e){ return s+e.cost; }, 0);
+    const rows = list.map(function(e){
+      return '<div class="entry-row"><div onclick="editEntry(\'' + e.id + '\')" style="cursor:pointer;flex:1;">' + money(e.cost) + (e.people?(' · '+e.people+' people'):'') + (e.note?(' · '+e.note):'') + '</div><button class="del" onclick="deleteEntry(\'' + e.id + '\')">Delete</button></div>';
+    }).join("");
+    return '<div class="activity-block"><div class="activity-label"><span class="badge" style="background:' + t.color + '">' + initial(t.name) + '</span>' + t.name + '<span class="activity-sub">' + money(subtotal) + '</span></div>' + rows + '</div>';
+  }).join("") : '<div class="empty-msg" style="padding:10px 0;">No entries yet</div>';
+
+  const activitySelect = '<select id="entryTab">' + tabs.map(function(t){
+    return '<option value="' + t.id + '"' + (t.id===activeTabId?' selected':'') + '>' + t.name + '</option>';
+  }).join('') + '</select>';
+
+  sheet().innerHTML =
+    '<button class="close" onclick="closeSheet()">Close</button>' +
+    '<h2>' + label + '</h2>' +
+    (tabIdsWithEntries.length > 1 ? ('<div class="day-total-line">Day total across all activities: <strong>' + money(dayTotal) + '</strong></div>') : '') +
+    '<div id="entryList">' + sectionsHtml + '</div>' +
+    '<h2 style="margin-top:16px;" id="entryFormTitle">Add entry</h2>' +
+    activitySelect +
+    '<input type="hidden" id="entryEditId" value="">' +
+    '<div class="row"><input id="entryPeople" type="number" placeholder="People" min="0"><input id="entryCost" type="number" placeholder="Cost" min="0" step="0.01"></div>' +
+    '<input id="entryNote" placeholder="Note (optional)">' +
+    '<button class="primary" id="entrySaveBtn" style="background:var(--accent)" onclick="addEntry(\'' + dateStr + '\')">Add</button>';
+  overlay().classList.add("show");
+}
+
+function editEntry(id) {
+  const e = entries.find(function(x){ return x.id === id; });
+  if (!e) return;
+  document.getElementById("entryTab").value = e.tabId;
+  document.getElementById("entryPeople").value = e.people || "";
+  document.getElementById("entryCost").value = e.cost || "";
+  document.getElementById("entryNote").value = e.note || "";
+  document.getElementById("entryEditId").value = id;
+  document.getElementById("entrySaveBtn").textContent = "Save changes";
+  document.getElementById("entryFormTitle").textContent = "Edit entry";
+}
+
+async function addEntry(dateStr) {
+  const editId = document.getElementById("entryEditId").value;
+  const tabId = document.getElementById("entryTab").value;
+  const people = parseInt(document.getElementById("entryPeople").value) || 0;
+  const cost = parseFloat(document.getElementById("entryCost").value) || 0;
+  const note = document.getElementById("entryNote").value.trim();
+  if (cost === 0 && people === 0 && !note) return;
+  if (editId) {
+    await db.doc("entries/" + editId).update({ tabId: tabId, people: people, cost: cost, note: note });
+  } else {
+    await db.collection("entries").add({ tabId: tabId, date: dateStr, people: people, cost: cost, note: note, createdAt: Date.now() });
+  }
+  openDay(dateStr);
+}
+
+async function deleteEntry(id) { await db.doc("entries/" + id).delete(); }
+
+async function init() {
+  db = await claude.use("db");
+  if (!db) { render(); return; }
+  db.collection("tabs").orderBy("createdAt","asc").onSnapshot(function(snap){
+    tabs = snap.docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+    render();
+  });
+  db.collection("entries").onSnapshot(function(snap){
+    entries = snap.docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+    render();
+  });
+}
+init();
+</script>
+</body>
+</html>
